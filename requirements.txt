@@ -1,0 +1,5 @@
+gym
+opencv-python
+stable-baselines3
+shimmy
+mujoco==2.3.0
