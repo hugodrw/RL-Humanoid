@@ -6,9 +6,6 @@ import torch
 import torch.nn as nn
 from torch.distributions.normal import Normal
 
-def combined_shape(length, shape=None):
-    pass
-
 
 # on laisse la possibilité de moduler le NN ou on en code un immutable dans l'actor et le critic?
 def mlp(sizes, activation, output_activation=nn.Identity):
@@ -18,12 +15,9 @@ def mlp(sizes, activation, output_activation=nn.Identity):
         layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
     return nn.Sequential(*layers)
 
-def count_vars(module):
-    pass
-
 def discount_cumsum(x, discount):
     """
-    magic from rllab for computing discounted cumulative sums of vectors.
+    Computes discounted cumulative sums of vectors.
 
     input: 
         vector x, 
@@ -36,7 +30,8 @@ def discount_cumsum(x, discount):
          x1 + discount * x2,
          x2]
     """
-    pass
+    discount_list = np.array([discount**i for i in range(len(x)+1)])
+    return np.array([sum(discount_list[:-(1+i)]*x[i:]) for i in range(len(x))])
 
 
 class MLPGaussianActor(nn.Module):
@@ -46,7 +41,7 @@ class MLPGaussianActor(nn.Module):
         # we initialize log_std and make it learnable
         # the std is used in the normal distribution used by the policy to control exploration
         # we learn log_std instead of std because 
-        #   1. std must be positive whereas log_std is unbounded as the exponential will make it positive (which simplifies the optimization process)
+        #   1. std must be positive whereas log_std is unbounded as the exponential will ensure it is positive (that simplifies the optimization process)
         #   2. log space is generally more numerically stable
         #   3. log standard deviation parameter can be adjusted more finely than the standard deviation to have a better control over exploration behavior of the policy
         log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
@@ -58,7 +53,7 @@ class MLPGaussianActor(nn.Module):
     def _distribution(self, obs):
         # Normal distribution used by the policy to control exploration
         mu = self.mu_net(obs)
-        std = torch.exp(torch.tensor(self.log_std))
+        std = torch.exp(self.log_std)
         return Normal(mu, std)
 
     def _log_prob_from_distribution(self, pi, act):
@@ -75,8 +70,9 @@ class MLPGaussianActor(nn.Module):
             logp_a = self._log_prob_from_distribution(pi, act) 
         return pi, logp_a 
 
-class MLPCritic(nn.Module):
 
+class MLPCritic(nn.Module):
+    
     def __init__(self, obs_dim, hidden_sizes, activation):
         super().__init__()
         self.v_net = mlp([obs_dim] + list(hidden_sizes) + [1], activation)
@@ -97,7 +93,7 @@ class MLPActorCritic(nn.Module):
         self.v = MLPCritic(obs_dim, hidden_sizes, activation)
 
     def step(self, obs):
-        with torch.no_grad():
+        with torch.no_grad(): # why no grad here ? check the computational graph in ppo.py
             pi = self.pi._distribution(obs)
             a = pi.sample()
             logp_a = self.pi._log_prob_from_distribution(pi, a)
