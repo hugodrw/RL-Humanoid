@@ -14,16 +14,16 @@ class PPOBuffer:
     """
 
     def __init__(self, obs_dim, act_dim, buffer_size, gamma=0.99, lam=0.95):
-        self.obs_buf = np.zeros((buffer_size, obs_dim), dtype=np.float32)
-        self.act_buf = np.zeros((buffer_size, act_dim), dtype=np.float32)
-        self.adv_buf = np.zeros(buffer_size, dtype=np.float32)
-        self.rew_buf = np.zeros(buffer_size, dtype=np.float32)
-        self.ret_buf = np.zeros(buffer_size, dtype=np.float32)
-        self.val_buf = np.zeros(buffer_size, dtype=np.float32)
-        self.logp_buf = np.zeros(buffer_size, dtype=np.float32)
+        self.obs_buf = np.zeros((buffer_size, obs_dim), dtype=np.float32) # observation
+        self.act_buf = np.zeros((buffer_size, act_dim), dtype=np.float32) # action
+        self.adv_buf = np.zeros(buffer_size, dtype=np.float32) # advantage
+        self.rew_buf = np.zeros(buffer_size, dtype=np.float32) # reward
+        self.ret_buf = np.zeros(buffer_size, dtype=np.float32) # return
+        self.val_buf = np.zeros(buffer_size, dtype=np.float32) # value
+        self.logp_buf = np.zeros(buffer_size, dtype=np.float32) # log probability
 
         self.gamma, self.lam = gamma, lam
-        self.pos = 0  # pos is the index of a given timestep of agent-environment interaction
+        self.pos = 0  # pos is the index of a given timestep of agent-environment interaction in the buffer
         self.path_start_idx = 0
         self.max_size = buffer_size
 
@@ -41,11 +41,53 @@ class PPOBuffer:
 
 
     def finish_path(self, last_val=0):
-        # https://arxiv.org/pdf/1506.02438.pdf
-        pass
+        """
+        Call this at the end of a trajectory, or when one gets cut off
+        by an epoch ending. This looks back in the buffer to where the
+        trajectory started, and uses rewards and value estimates from
+        the whole trajectory to compute advantage estimates with GAE-Lambda (https://arxiv.org/pdf/1506.02438.pdf ),
+        as well as compute the rewards-to-go for each state, to use as
+        the targets for the value function.
+        
+        The "last_val" argument should be 0 if the trajectory ended
+        because the agent reached a terminal state (died), and otherwise
+        should be V(s_T), the value function estimated for the last state.
+        This allows us to bootstrap the reward-to-go calculation to account
+        for timesteps beyond the arbitrary episode horizon (or epoch cutoff).
+        """
+        path_slice = slice(self.path_start_idx, self.pos)
+        # append value at the end of reward list:
+        #   if timeout: enable boostraping 
+        #   if terminal state: value is reward
+        rewards = np.append(self.rew_buf[path_slice], last_val)
+        values = np.append(self.val_buf[path_slice], last_val)
+
+        # GAE-Lambda advantage calculation
+        deltas = rewards[:-1] + self.gamma * values[1:] - values[:-1] # TD error
+        self.adv_buf[path_slice] = utils.discount_cumsum(deltas, self.gamma * self.lam) 
+
+        # the next line computes rewards-to-go, to be targets for the value function
+        self.ret_buf[path_slice] = utils.discount_cumsum(rewards, self.gamma)[:-1]         # why [:-1] ?
+
 
     def get(self):
-        pass
+        """
+        Call this at the end of an epoch to get all of the data from
+        the buffer, with advantages appropriately normalized (shifted to have
+        mean zero and std one). Also, resets some pointers in the buffer.
+        """
+        assert self.ptr == self.max_size    # buffer has to be full before you can get   ------ if not full, what happens ? 
+
+        # advantage normalization tricks
+        mean_adv, mean_std = self.adv_buf.mean(), self.adv_buf.std()
+        normalized_adv = (self.adv_buf - mean_adv) / mean_std
+
+        # we create a dict with all the data from the buffer
+        data = dict(obs=self.obs_buf, act=self.act_buf, ret=self.ret_buf,
+                    adv=self.adv_buf, logp=self.logp_buf)
+
+        # we transform dict values in torch tensor
+        return {k: torch.as_tensor(v, dtype=torch.float32) for k,v in data.items()}
 
 
 
