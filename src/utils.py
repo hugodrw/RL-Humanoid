@@ -70,6 +70,9 @@ class MLPGaussianActor(nn.Module):
         logp_a = None
         if act is not None:
             logp_a = self._log_prob_from_distribution(pi, act) 
+
+        # NB: pi is a vector normal distribution of size act_dim,
+        # logp_a is a scalar for a given action
         return pi, logp_a 
 
 
