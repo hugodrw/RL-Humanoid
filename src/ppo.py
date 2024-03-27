@@ -76,7 +76,7 @@ class PPOBuffer:
         the buffer, with advantages appropriately normalized (shifted to have
         mean zero and std one). Also, resets some pointers in the buffer.
         """
-        assert self.ptr == self.max_size    # buffer has to be full before you can get   ------ if not full, what happens ? 
+        assert self.ptr == self.max_size    # buffer has to be full before you can get
 
         # advantage normalization tricks
         mean_adv, mean_std = self.adv_buf.mean(), self.adv_buf.std()
@@ -90,6 +90,28 @@ class PPOBuffer:
         return {k: torch.as_tensor(v, dtype=torch.float32) for k,v in data.items()}
 
 
+def env_fn(env, seed):
+    """
+    Environment preprocessing to enhance performance
+    Tricks used : Normalization of Observation, Observation Clipping, Reward Scaling, reward Clipping
+    """
+    def thunk():
+        env = gym.make(env)
+        env = gym.wrappers.ClipAction(env)
+        env = gym.wrappers.NormalizeObservation(env)
+        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
+        env = gym.wrappers.NormalizeReward(env)
+        env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10))
+        env.seed(seed)
+        env.action_space.seed(seed)
+        env.observation_space.seed(seed)
+
+        return env
+    
+    # return a function that will be instantiated in the ppo function
+    return thunk
+
+
 
 def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
@@ -101,10 +123,9 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
     with early stopping based on approximate KL
     
     Args:
-        env_fn : a function which creates a copy of the environment. 
-        ----> Normalization of Observation, Observation clipping, Reward scaling, Reward clipping here ? 
-        ----> to check https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/common/vec_env/vec_normalize.py#L39
-
+        env_fn : a function that apply preprocessing.
+        
+        actor_critic: 
         ...
     """
     # Random seed
@@ -123,14 +144,12 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
     # Set up experience buffer
     buf = PPOBuffer(obs_dim, act_dim, steps_per_epoch, gamma, lam)
 
-
-
-
-
+    #  =========== Helper functions ===========
 
     # Set up function for computing PPO policy loss
     def compute_loss_pi(data):
         pass
+
 
     # Set up function for computing value loss
     def compute_loss_v(data):
@@ -138,10 +157,13 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # Set up optimizers for policy and value function
 
-
     # Set up fonction to perform PPO update
     def update():
         pass
+
+    # =========== Main Script ===========
+    
+    # blabla
 
 
 if __name__ == '__main__':
@@ -155,9 +177,17 @@ if __name__ == '__main__':
     parser.add_argument('--steps', type=int, default=4000)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--exp_name', type=str, default='ppo')
-    args = parser.parse_args()
+    parser.add_argument('--normalize_env', type=bool, default='False')
 
-    ppo(lambda : gym.make(args.env), actor_critic=utils.MLPActorCritic,
-        ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, 
-        seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs)
+    args = parser.parse_args()
+    
+    if args.normalize_env == False: 
+        ppo(gym.make(args.env), actor_critic=utils.MLPActorCritic,
+            ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, 
+            seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs)
+    else:
+        ppo(env_fn(args.env, args.seed), actor_critic=utils.MLPActorCritic,
+            ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, 
+            seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs)
+    
     
