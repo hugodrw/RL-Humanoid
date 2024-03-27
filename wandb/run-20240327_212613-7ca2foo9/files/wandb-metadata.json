@@ -1,0 +1,44 @@
+{
+    "os": "Windows-10-10.0.22631-SP0",
+    "python": "3.10.0",
+    "heartbeatAt": "2024-03-27T20:26:15.650312",
+    "startedAt": "2024-03-27T20:26:13.958005",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "-m src.ppo",
+    "codePathLocal": null,
+    "git": {
+        "remote": "https://github.com/hugodrw/RL-Humanoid.git",
+        "commit": "63e635b1ed1571c43ede19b864dc49342bf74bc1"
+    },
+    "email": "81863563+apoupon@users.noreply.github.com",
+    "root": "C:/Users/Antoine/Desktop/CentraleSupelec/6_Reinforcement learning/Project/RL-Humanoid",
+    "host": "PC_de_Antoine",
+    "username": "Antoine",
+    "executable": "C:\\ProgramData\\anaconda3\\envs\\MujocoProject\\python.exe",
+    "cpu_count": 4,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2419.0,
+        "min": 0.0,
+        "max": 2419.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2419.0,
+            "min": 0.0,
+            "max": 2419.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 475.5403480529785,
+            "used": 403.708194732666
+        }
+    },
+    "memory": {
+        "total": 7.701686859130859
+    }
+}
