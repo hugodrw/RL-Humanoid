@@ -89,22 +89,57 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # Set up function for computing value loss
     def compute_loss_v(data):
-        pass
+        obs, ret = data['obs'], data['ret']
+        # Manual implementation of L2 loss, could replace with torch implem
+        # Target is actual return 
+        return ((ac.v(obs) - ret)**2).mean()
 
-    # Set up optimizers for policy and value function
-
+    # Set up optimizers for policy and value function used below
+    pi_optimizer = Adam(ac.pi.parameters(), lr=pi_lr)
+    vf_optimizer = Adam(ac.v.parameters(), lr=vf_lr)
 
     # Set up fonction to perform PPO update
     def update():
-        pass
+        '''
+            Update the value and policy networks, called every epoch
+        '''
+        # Get the whole dataset from buffer
+        data = buf.get()
+
+        # Maximise the relative return based on the estimated values by updating the policy weights
+        # Stops when the max iterations are hit or AVG KL divergence threshold is hit
+        for i in range(train_pi_iters):
+            # No batches, loss cumputed on entire RL epoch
+            pi_optimizer.zero_grad()
+            loss_pi, pi_info = compute_loss_pi(data)
+            kl = pi_info['kl'] # TODO: check mpi_avg(pi_info['kl'])
+            if kl > 1.5 * target_kl:
+                print('Early stopping at step %d due to reaching max kl.'%i)
+                break
+            loss_pi.backward()
+            # mpi_avg_grads(ac.pi)    # average grads across MPI processes
+            pi_optimizer.step()
+
+        # Learn the new value function based on the latest policy
+        for i in range(train_v_iters):
+            # No batches, loss cumputed on entire RL epoch
+            vf_optimizer.zero_grad()
+            loss_v = compute_loss_v(data)
+            loss_v.backward()
+            # mpi_avg_grads(ac.v)    # average grads across MPI processes
+            vf_optimizer.step()
+
+        
 
     # =========== Main Script ===========
-    # Reset the env and get the first observation
-    start_time = time.time()
+    # Reset the env, ep length and get the first observation
     obs, ep_ret, ep_len = env.reset(), 0, 0
 
-    # Main training loop
+    # Main RL Loop
     for epoch in range(epochs):
+        # Generate experience by acting in the environment, using the current policy
+        # This runs until the buffer is full, and resets the environment when an episode ends
+        # Many episodes are run sequentially, and the buffer is filled with the experience
         for step_count in range(steps_per_epoch):
             # Get action, value and logp used for policy backprop
             a, v, logp = ac.step(torch.as_tensor(obs, dtype=torch.float32))
@@ -112,7 +147,7 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
             # Take a step in the env using the selected action
             next_o, r, d, _ = env.step(a)
             episode_return += r
-            episode_len += 1
+            ep_len += 1
             
             # save to the buffer with the previous state, action and reward
             buf.store(obs, a, r, v, logp)
@@ -120,14 +155,25 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
             # Update the observation
             obs = next_o
 
-            # check if timeout or terminal state reached
-            timeout = ep_len == max_ep_len
+            # Check for special cases
+            episode_timeout = ep_len == max_ep_len
+            terminal = d or episode_timeout
+            epoch_ended = step_count==steps_per_epoch-1
 
             if terminal or epoch_ended:
-                
+                if epoch_ended and not(terminal):
+                    print('Warning: trajectory cut off by epoch at %d steps.'%ep_len, flush=True)
+                # bootstrap value target if not terminal
+                if episode_timeout or epoch_ended:
+                    _, v, _ = ac.step(torch.as_tensor(obs, dtype=torch.float32))
+                else:
+                    v = 0
+                # Finish the path and restart the env for a new episode
+                buf.finish_path(v)
+                o, ep_ret, ep_len = env.reset(), 0, 0
         
-    # Perform PPO update
-    update()
+        # Perform PPO update for this epoch
+        update()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
