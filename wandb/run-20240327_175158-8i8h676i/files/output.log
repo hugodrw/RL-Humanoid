@@ -1,0 +1,73 @@
+/Users/hugoderohanwillner/anaconda3/envs/MSc_RL/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+Warning: trajectory cut off by epoch at 5 steps.
+Warning: trajectory cut off by epoch at 21 steps.
+Warning: trajectory cut off by epoch at 15 steps.
+Warning: trajectory cut off by epoch at 14 steps.
+Warning: trajectory cut off by epoch at 15 steps.
+Warning: trajectory cut off by epoch at 30 steps.
+Warning: trajectory cut off by epoch at 2 steps.
+Warning: trajectory cut off by epoch at 28 steps.
+Warning: trajectory cut off by epoch at 25 steps.
+Warning: trajectory cut off by epoch at 17 steps.
+Warning: trajectory cut off by epoch at 4 steps.
+Warning: trajectory cut off by epoch at 9 steps.
+Warning: trajectory cut off by epoch at 5 steps.
+Warning: trajectory cut off by epoch at 9 steps.
+Warning: trajectory cut off by epoch at 16 steps.
+Warning: trajectory cut off by epoch at 36 steps.
+Warning: trajectory cut off by epoch at 2 steps.
+Warning: trajectory cut off by epoch at 42 steps.
+Warning: trajectory cut off by epoch at 17 steps.
+Warning: trajectory cut off by epoch at 7 steps.
+Warning: trajectory cut off by epoch at 36 steps.
+Warning: trajectory cut off by epoch at 13 steps.
+Early stopping at step 8 due to reaching max kl.
+Warning: trajectory cut off by epoch at 3 steps.
+Warning: trajectory cut off by epoch at 41 steps.
+Warning: trajectory cut off by epoch at 23 steps.
+Warning: trajectory cut off by epoch at 29 steps.
+Warning: trajectory cut off by epoch at 29 steps.
+Warning: trajectory cut off by epoch at 43 steps.
+Warning: trajectory cut off by epoch at 6 steps.
+Early stopping at step 28 due to reaching max kl.
+Warning: trajectory cut off by epoch at 23 steps.
+Early stopping at step 7 due to reaching max kl.
+Warning: trajectory cut off by epoch at 29 steps.
+Early stopping at step 2 due to reaching max kl.
+Warning: trajectory cut off by epoch at 7 steps.
+Early stopping at step 3 due to reaching max kl.
+Warning: trajectory cut off by epoch at 3 steps.
+Early stopping at step 3 due to reaching max kl.
+Warning: trajectory cut off by epoch at 3 steps.
+Early stopping at step 3 due to reaching max kl.
+Warning: trajectory cut off by epoch at 4 steps.
+Early stopping at step 3 due to reaching max kl.
+Warning: trajectory cut off by epoch at 43 steps.
+Early stopping at step 3 due to reaching max kl.
+Warning: trajectory cut off by epoch at 25 steps.
+Early stopping at step 4 due to reaching max kl.
+Warning: trajectory cut off by epoch at 33 steps.
+Early stopping at step 4 due to reaching max kl.
+Warning: trajectory cut off by epoch at 2 steps.
+Early stopping at step 2 due to reaching max kl.
+Warning: trajectory cut off by epoch at 11 steps.
+Early stopping at step 2 due to reaching max kl.
+Warning: trajectory cut off by epoch at 17 steps.
+Early stopping at step 2 due to reaching max kl.
+Warning: trajectory cut off by epoch at 34 steps.
+Early stopping at step 3 due to reaching max kl.
+Warning: trajectory cut off by epoch at 107 steps.
+Early stopping at step 4 due to reaching max kl.
+Warning: trajectory cut off by epoch at 31 steps.
+Early stopping at step 2 due to reaching max kl.
+Warning: trajectory cut off by epoch at 3 steps.
+Early stopping at step 2 due to reaching max kl.
+Warning: trajectory cut off by epoch at 84 steps.
+Early stopping at step 3 due to reaching max kl.
+Warning: trajectory cut off by epoch at 65 steps.
+Early stopping at step 5 due to reaching max kl.
+Warning: trajectory cut off by epoch at 64 steps.
+Early stopping at step 2 due to reaching max kl.
+Warning: trajectory cut off by epoch at 28 steps.
+Early stopping at step 3 due to reaching max kl.

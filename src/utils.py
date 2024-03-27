@@ -102,8 +102,8 @@ class MLPActorCritic(nn.Module):
             pi = self.pi._distribution(obs)
             a = pi.sample()
             logp_a = self.pi._log_prob_from_distribution(pi, a)
-            v = self.v(a)
-            return a.numpy(), logp_a.numpy(), v.numpy() # why numpy instead of tensor? 
+            v = self.v(obs)
+            return a.numpy(), v.numpy(), logp_a.numpy() # why numpy instead of tensor? 
 
     def act(self, obs):
         return self.step(obs)[0]

@@ -14,8 +14,8 @@ class PPOBuffer:
     """
 
     def __init__(self, obs_dim, act_dim, buffer_size, gamma=0.99, lam=0.95):
-        self.obs_buf = np.zeros((buffer_size, obs_dim), dtype=np.float32) # observation
-        self.act_buf = np.zeros((buffer_size, act_dim), dtype=np.float32) # action
+        self.obs_buf = np.zeros((buffer_size, *obs_dim), dtype=np.float32) # transform (x, ) to x 
+        self.act_buf = np.zeros((buffer_size, *act_dim), dtype=np.float32) # action
         self.adv_buf = np.zeros(buffer_size, dtype=np.float32) # advantage
         self.rew_buf = np.zeros(buffer_size, dtype=np.float32) # reward
         self.ret_buf = np.zeros(buffer_size, dtype=np.float32) # return
@@ -31,7 +31,7 @@ class PPOBuffer:
         """
         Append one timestep of agent-environment interaction to the buffer.
         """
-        assert self.ptr < self.max_size     # buffer has to have room so you can store
+        assert self.pos < self.max_size     # buffer has to have room so you can store
         self.obs_buf[self.pos] = obs
         self.act_buf[self.pos] = act
         self.rew_buf[self.pos] = rew
@@ -67,7 +67,9 @@ class PPOBuffer:
         self.adv_buf[path_slice] = utils.discount_cumsum(deltas, self.gamma * self.lam) 
 
         # the next line computes rewards-to-go, to be targets for the value function
-        self.ret_buf[path_slice] = utils.discount_cumsum(rewards, self.gamma)[:-1]         # why [:-1] ?
+        self.ret_buf[path_slice] = utils.discount_cumsum(rewards, self.gamma)[:-1]  
+        
+        self.path_start_idx = self.pos
 
 
     def get(self):
@@ -76,8 +78,8 @@ class PPOBuffer:
         the buffer, with advantages appropriately normalized (shifted to have
         mean zero and std one). Also, resets some pointers in the buffer.
         """
-        assert self.ptr == self.max_size    # buffer has to be full before you can get
-
+        assert self.pos == self.max_size    # buffer has to be full before you can get
+        self.pos, self.path_start_idx = 0, 0 # reset pointers
         # advantage normalization tricks
         mean_adv, mean_std = self.adv_buf.mean(), self.adv_buf.std()
         normalized_adv = (self.adv_buf - mean_adv) / mean_std
@@ -90,7 +92,7 @@ class PPOBuffer:
         return {k: torch.as_tensor(v, dtype=torch.float32) for k,v in data.items()}
 
 
-def env_fn(env, seed):
+def normalised_env_function(env, seed):
     """
     Environment preprocessing to enhance performance
     Tricks used : Normalization of Observation, Observation Clipping, Reward Scaling, reward Clipping
@@ -214,7 +216,8 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # =========== Main Script ===========
     # Reset the env, ep length and get the first observation
-    obs, ep_ret, ep_len = env.reset(), 0, 0
+    (obs, _), episode_return, ep_len = env.reset(), 0, 0 # handle new version of gym
+
 
     # Main RL Loop
     for epoch in range(epochs):
@@ -226,7 +229,7 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
             a, v, logp = ac.step(torch.as_tensor(obs, dtype=torch.float32))
 
             # Take a step in the env using the selected action
-            next_o, r, term, _ = env.step(a)
+            next_o, r, term, _, _ = env.step(a)
             episode_return += r
             ep_len += 1
             
@@ -249,9 +252,17 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
                     _, v, _ = ac.step(torch.as_tensor(obs, dtype=torch.float32))
                 else:
                     v = 0
+                if term and use_wandb:
+                    # Log wandb
+                    # wand logging
+                    wandb.log({
+                            "episode reward": episode_return,
+                            "mean episode reward": episode_return/ep_len,
+                            "episode length": ep_len,
+                        })
                 # Finish the path and restart the env for a new episode
                 buf.finish_path(v)
-                o, ep_ret, ep_len = env.reset(), 0, 0
+                (obs, _), episode_return, ep_len = env.reset(), 0, 0
         
         # Perform PPO update for this epoch
         update()
@@ -264,21 +275,29 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--cpu', type=int, default=4)
+    parser.add_argument('--cpu', type=int, default=1)
     parser.add_argument('--steps', type=int, default=4000)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--exp_name', type=str, default='ppo')
     parser.add_argument('--normalize_env', type=bool, default='False')
 
     args = parser.parse_args()
+
+    print(args.cpu)
+    print(args.normalize_env)
+
+    use_wandb = True
+    if use_wandb:
+        import wandb
+        wandb.init(project='RL-Humanoid')
     
-    if args.normalize_env == False: 
-        ppo(gym.make(args.env), actor_critic=utils.MLPActorCritic,
-            ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, 
-            seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs)
-    else:
-        ppo(env_fn(args.env, args.seed), actor_critic=utils.MLPActorCritic,
-            ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, 
-            seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs)
+    ppo(lambda: gym.make(args.env), actor_critic=utils.MLPActorCritic,
+        ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, 
+        seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs)
+    
+    # else:
+    #     ppo(env_fn(args.env, args.seed), actor_critic=uls.MLPActorCritic,
+    #         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), gamma=args.gamma, 
+    #         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs)
     
     
