@@ -7,7 +7,6 @@ import torch.nn as nn
 from torch.distributions.normal import Normal
 
 
-# on laisse la possibilité de moduler le NN ou on en code un immutable dans l'actor et le critic?
 def mlp(sizes, activation, output_activation=nn.Identity):
     '''
         Spinup a variable size MLP
