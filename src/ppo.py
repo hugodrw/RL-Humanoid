@@ -253,7 +253,7 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
                     _, v, _ = ac.step(torch.as_tensor(obs, dtype=torch.float32))
                 else:
                     v = 0
-                if term and use_wandb:
+                if term and args.use_wandb:
                     # Log wandb
                     # wand logging
                     wandb.log({
@@ -281,12 +281,12 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--exp_name', type=str, default='ppo')
     parser.add_argument('--normalize_env', type=bool, default=False)
+    parser.add_argument('--use_wandb', type=bool, default=False)
 
     args = parser.parse_args()
 
 
-    use_wandb = False
-    if use_wandb:
+    if args.use_wandb:
         import wandb
         wandb.init(project='RL-Humanoid')
     
