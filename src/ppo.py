@@ -85,13 +85,32 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # Set up function for computing PPO policy loss
     def compute_loss_pi(data):
-        pass
+        '''
+            Policy loss, as described in the "Proximal Policy Optimization Algorithms" paper
+            https://arxiv.org/abs/1707.06347
+        '''
+        # Seperate the values of the data
+        obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
+
+        # Compute the loss using the equation from the paper
+        pi, logp = ac.pi(obs, act)
+        ratio = torch.exp(logp - logp_old)
+        clip_adv = torch.clamp(ratio, 1-clip_ratio, 1+clip_ratio) * adv
+        normal_av = ratio * adv
+        loss_pi = -(torch.min(normal_av, clip_adv)).mean()
+
+        # Compute the approx KL. Optimisation trick described here: 
+        # https://spinningup.openai.com/en/latest/algorithms/ppo.html#key-equations
+        mean_approx_kl = (logp_old - logp).mean().item()
+
+        return loss_pi, mean_approx_kl
+
 
     # Set up function for computing value loss
     def compute_loss_v(data):
         obs, ret = data['obs'], data['ret']
         # Manual implementation of L2 loss, could replace with torch implem
-        # Target is actual return 
+        # Label for the network is explicit return (sum of rewards)
         return ((ac.v(obs) - ret)**2).mean()
 
     # Set up optimizers for policy and value function used below
@@ -109,11 +128,10 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
         # Maximise the relative return based on the estimated values by updating the policy weights
         # Stops when the max iterations are hit or AVG KL divergence threshold is hit
         for i in range(train_pi_iters):
-            # No batches, loss cumputed on entire RL epoch
+            # No batches, loss computed on entire RL epoch
             pi_optimizer.zero_grad()
-            loss_pi, pi_info = compute_loss_pi(data)
-            kl = pi_info['kl'] # TODO: check mpi_avg(pi_info['kl'])
-            if kl > 1.5 * target_kl:
+            loss_pi, mean_approx_kl = compute_loss_pi(data) # TODO: check mpi_avg(pi_info['kl'])
+            if mean_approx_kl > 1.5 * target_kl:
                 print('Early stopping at step %d due to reaching max kl.'%i)
                 break
             loss_pi.backward()
@@ -122,7 +140,7 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
         # Learn the new value function based on the latest policy
         for i in range(train_v_iters):
-            # No batches, loss cumputed on entire RL epoch
+            # No batches, loss computed on entire RL epoch
             vf_optimizer.zero_grad()
             loss_v = compute_loss_v(data)
             loss_v.backward()
@@ -145,7 +163,7 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
             a, v, logp = ac.step(torch.as_tensor(obs, dtype=torch.float32))
 
             # Take a step in the env using the selected action
-            next_o, r, d, _ = env.step(a)
+            next_o, r, term, _ = env.step(a)
             episode_return += r
             ep_len += 1
             
@@ -157,7 +175,7 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
             # Check for special cases
             episode_timeout = ep_len == max_ep_len
-            terminal = d or episode_timeout
+            terminal = term or episode_timeout
             epoch_ended = step_count==steps_per_epoch-1
 
             if terminal or epoch_ended:
