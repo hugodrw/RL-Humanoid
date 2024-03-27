@@ -9,6 +9,9 @@ from torch.distributions.normal import Normal
 
 # on laisse la possibilité de moduler le NN ou on en code un immutable dans l'actor et le critic?
 def mlp(sizes, activation, output_activation=nn.Identity):
+    '''
+        Spinup a variable size MLP
+    '''
     layers = []
     for j in range(len(sizes)-1):
         act = activation if j < len(sizes)-2 else output_activation
@@ -68,6 +71,9 @@ class MLPGaussianActor(nn.Module):
         logp_a = None
         if act is not None:
             logp_a = self._log_prob_from_distribution(pi, act) 
+
+        # NB: pi is a vector normal distribution of size act_dim,
+        # logp_a is a scalar for a given action
         return pi, logp_a 
 
 

@@ -65,6 +65,8 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
         ...
     """
+    #  =========== Helper functions ===========
+
     # Random seed
     seed = 0
     torch.manual_seed(seed)
@@ -81,11 +83,6 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
     # Set up experience buffer
     buf = PPOBuffer(obs_dim, act_dim, steps_per_epoch, gamma, lam)
 
-
-
-
-
-
     # Set up function for computing PPO policy loss
     def compute_loss_pi(data):
         pass
@@ -101,6 +98,36 @@ def ppo(env_fn, actor_critic=utils.MLPActorCritic, ac_kwargs=dict(), seed=0,
     def update():
         pass
 
+    # =========== Main Script ===========
+    # Reset the env and get the first observation
+    start_time = time.time()
+    obs, ep_ret, ep_len = env.reset(), 0, 0
+
+    # Main training loop
+    for epoch in range(epochs):
+        for step_count in range(steps_per_epoch):
+            # Get action, value and logp used for policy backprop
+            a, v, logp = ac.step(torch.as_tensor(obs, dtype=torch.float32))
+
+            # Take a step in the env using the selected action
+            next_o, r, d, _ = env.step(a)
+            episode_return += r
+            episode_len += 1
+            
+            # save to the buffer with the previous state, action and reward
+            buf.store(obs, a, r, v, logp)
+
+            # Update the observation
+            obs = next_o
+
+            # check if timeout or terminal state reached
+            timeout = ep_len == max_ep_len
+
+            if terminal or epoch_ended:
+                
+        
+    # Perform PPO update
+    update()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
